@@ -6,10 +6,7 @@ swChannel.onmessage = (e) => {
         const resolve = clientsMap.get(e.data.id);
         if (resolve) {
             resolve(new Response(JSON.stringify(e.data.response), {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                }
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
             }));
             clientsMap.delete(e.data.id);
         }
@@ -19,45 +16,51 @@ swChannel.onmessage = (e) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // 1. Intercept the core streaming configuration layer
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-MCP-Protocol-Version',
+        'Access-Control-Expose-Headers': 'WWW-Authenticate, X-MCP-Protocol-Version'
+    };
+
+    if (event.request.method === 'OPTIONS') {
+        event.respondWith(new Response(null, { headers: corsHeaders }));
+        return;
+    }
+
+    // 1. Process standard Streaming initialization queries
     if (url.pathname.endsWith('/sse')) {
         const authHeader = event.request.headers.get('authorization');
         
-        // Satisfy the unauthenticated server scan sequence
+        // Provide the dynamic metadata challenge pointer required by the spec
         if (!authHeader) {
-            event.respondWith(new Response(JSON.stringify({ error: "Auth payload required" }), {
+            event.respondWith(new Response(JSON.stringify({ error: "Unauthorized" }), {
                 status: 401,
                 headers: {
+                    ...corsHeaders,
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
                     'WWW-Authenticate': `Bearer resource_metadata="${url.origin}/metadata.json"`
                 }
             }));
             return;
         }
 
-        // Establish the data pipeline stream
-        event.respondWith(new Response(
-            `data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
-            headers: {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Access-Control-Allow-Origin': '*'
-            }
+        event.respondWith(new Response(`data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
+            headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' }
         }));
     } 
 
-    // 2. Serve the OAuth Metadata file required by Claude’s interface probe
+    // 2. Serve metadata configuration specifications
     else if (url.pathname.endsWith('/metadata.json')) {
         event.respondWith(new Response(JSON.stringify({
             issuer: url.origin,
             token_endpoint: `${url.origin}/token`
         }), {
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }));
     }
 
-    // 3. Serialize and route JSON-RPC commands down to the page execution block
+    // 3. Serialize and route dynamic JSON-RPC queries
     else if (url.pathname.endsWith('/messages')) {
         event.respondWith(new Promise(async (resolve) => {
             try {
@@ -66,7 +69,7 @@ self.addEventListener('fetch', (event) => {
                 clientsMap.set(id, resolve);
                 swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
             } catch (err) {
-                resolve(new Response(JSON.stringify({ error: "Bad parameters" }), { status: 400 }));
+                resolve(new Response(JSON.stringify({ error: "Invalid payload layout" }), { status: 400, headers: corsHeaders }));
             }
         }));
     }
