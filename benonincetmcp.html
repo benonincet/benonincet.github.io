@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MCP Bridge</title>
+    <title>Benonincet MCP Endpoint</title>
 </head>
 <body>
     <script>
-        // 1. Initialize and link the sandbox network layer
+        // 1. Core Worker Registration
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js', { scope: './' })
-                .catch(err => console.error("Worker Boot Error: ", err));
+                .then(reg => reg.update())
+                .catch(err => console.error("Worker boot exception: " + err));
         }
 
-        // 2. Define strict tool contracts matching the Model Context Protocol
-        const SERVER_INFO = { name: "benonincet-mcp", version: "1.2.0" };
+        // 2. Define Official Protocol Schema
+        const SERVER_INFO = { name: "benonincet-mcp", version: "1.1.0" };
         const TOOLS_LIST = [
             {
                 name: "get_status",
@@ -27,7 +28,7 @@
             }
         ];
 
-        // 3. Process incoming execution queries transmitted from the Service Worker
+        // 3. Operational Message Channel Switch-Cases
         const mcpChannel = new BroadcastChannel('mcp_routing');
         mcpChannel.onmessage = async (event) => {
             const { type, body, id } = event.data;
@@ -40,9 +41,8 @@
                     response.result = { tools: TOOLS_LIST };
                 } else if (body.method === "tools/call") {
                     if (body.params.name === "get_status") {
-                        response.result = { content: [{ type: "text", text: `Endpoint active at: ${window.location.href}` }] };
+                        response.result = { content: [{ type: "text", text: `Fetched info: ${window.location.href}` }] };
                     } 
-                    // This is your data switch case targeting the info file
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
                             const targetUrl = 'https://github.io';
@@ -50,7 +50,7 @@
                             const jsonData = await fetchRes.text();
                             response.result = { content: [{ type: "text", text: jsonData }] };
                         } catch (error) {
-                            response.result = { content: [{ type: "text", text: `Fetch Error: ${error.message}` }], isError: true };
+                            response.result = { content: [{ type: "text", text: `Fetch failed: ${error.message}` }], isError: true };
                         }
                     }
                 }
