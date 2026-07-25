@@ -6,22 +6,18 @@
 </head>
 <body>
     <script>
-        // 1. Parse parameters out via search properties
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client_id');
         const redirectUri = urlParams.get('redirect_uri');
         const state = urlParams.get('state');
 
-        // 2. Strict client key gate matching your requested parameter
         if (clientId === 'pass' && redirectUri) {
-            
-            // Build the passing authorization string
+            // Generate the temporary code Claude's backend expects
             const AuthCode = "code_" + Math.random().toString(36).substring(2, 15);
             
-            // Rebuild structural parameter map for redirection matching state
+            // Rebuild the precise parameter string Claude expects
             const targetCallback = `${decodeURIComponent(redirectUri)}?code=${AuthCode}&state=${encodeURIComponent(state)}`;
             
-            // Swap location to trigger the background service worker token interceptor
             window.location.href = targetCallback;
         } else {
             document.body.innerText = "Error: Invalid Client Credentials or Missing Redirect Target.";
