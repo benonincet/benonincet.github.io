@@ -1,7 +1,7 @@
 const clientsMap = new Map();
 const swChannel = new BroadcastChannel('mcp_routing');
 
-// Handle responses coming back from the page layout context
+// Handle responses coming back from your mcp.html page script
 swChannel.onmessage = (e) => {
     if (e.data.type === 'mcp_response') {
         const resolve = clientsMap.get(e.data.id);
@@ -17,16 +17,15 @@ swChannel.onmessage = (e) => {
     }
 };
 
-// Main routing engine to handle network requests from the web client
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // 1. Handle primary Claude Connection and initial 401 challenge probe
+    // 1. Handle primary Claude Connection and 401 challenge sequence
     if (url.pathname.endsWith('/sse')) {
         const authHeader = event.request.headers.get('authorization');
         
         if (!authHeader) {
-            event.respondWith(new Response(JSON.stringify({ error: "OAuth context required." }), {
+            event.respondWith(new Response(JSON.stringify({ error: "Handshake required" }), {
                 status: 401,
                 headers: {
                     'Content-Type': 'application/json',
@@ -37,7 +36,7 @@ self.addEventListener('fetch', (event) => {
             return;
         }
 
-        // If authorization token check is passed, open the event stream channel
+        // Once validation clears, spin up the active stream mapping
         event.respondWith(new Response(
             `data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
             headers: {
@@ -48,23 +47,21 @@ self.addEventListener('fetch', (event) => {
         }));
     } 
 
-    // 2. Serve the simulated RFC OAuth Metadata Discovery file
+    // 2. Serve metadata configuration descriptors for RFC discovery
     else if (url.pathname.endsWith('/metadata.json')) {
         event.respondWith(new Response(JSON.stringify({
             issuer: url.origin,
             token_endpoint: `${url.origin}/token`
         }), {
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Access-Control-Allow-Origin': '*' 
-            }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         }));
     }
 
-    // 3. Process the OAuth token checkpoint validation
+    // 3. FIX: Handle the backend POST verification token exchange request
+    // This removes the "Authorization with the MCP server failed" error code block
     else if (url.pathname.endsWith('/token')) {
         event.respondWith(new Response(JSON.stringify({
-            access_token: "mock_secure_pass_token",
+            access_token: "benonincet_universal_pass_token",
             token_type: "Bearer",
             expires_in: 3600
         }), {
@@ -75,7 +72,7 @@ self.addEventListener('fetch', (event) => {
         }));
     }
 
-    // 4. Trap and route JSON-RPC tool/method execution messages
+    // 4. Trap and serialize tool execution JSON-RPC payloads
     else if (url.pathname.endsWith('/messages')) {
         event.respondWith(new Promise(async (resolve) => {
             try {
@@ -84,12 +81,11 @@ self.addEventListener('fetch', (event) => {
                 clientsMap.set(id, resolve);
                 swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
             } catch (err) {
-                resolve(new Response(JSON.stringify({ error: "Invalid JSON payload" }), { status: 400 }));
+                resolve(new Response(JSON.stringify({ error: "Invalid syntax layout" }), { status: 400 }));
             }
         }));
     }
 });
 
-// Force worker to activate instantly on first load without needing a manual refresh
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
