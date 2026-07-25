@@ -34,6 +34,9 @@
       font-size: 0.95rem;
       color: #333;
     }
+    #status { padding: 10px; border-radius: 4px; background: #eee; margin-bottom: 20px; font-weight: bold; }
+    .active { background: #d4edda !important; color: #155724; }
+    pre { background: #f8f9fa; padding: 15px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -51,11 +54,22 @@
             logsPre.textContent += `\n[${new Date().toLocaleTimeString()}] ${message}`;
         }
 
-        // 1. Initialize Service Worker dynamically from the same file
+        // 1. Register the separate sw.js file
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register(window.location.pathname + '?sw=true', { scope: './' })
-                .then(() => log("Service Worker successfully active."))
-                .catch(err => log("Worker error: " + err));
+            navigator.serviceWorker.register('./sw.js', { scope: './' })
+                .then((reg) => {
+                    log("Service Worker successfully registered.");
+                    // Check if worker is already controlling the page
+                    if (navigator.serviceWorker.controller) {
+                        log("Service Worker is actively controlling the page.");
+                    }
+                })
+                .catch(err => log("Worker registration error: " + err));
+            
+            // Listen for controller changes to verify activation
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                log("Service Worker claim acquired. Page is now controlled.");
+            });
         }
 
         // 2. Define the MCP Server Metadata and Custom Tools
@@ -73,7 +87,7 @@
             }
         ];
 
-        // 3. Simple Broadcast Channel Communication
+        // 3. Setup Broadcast Channel Communication
         const mcpChannel = new BroadcastChannel('mcp_routing');
         mcpChannel.onmessage = async (event) => {
             const { type, body, id } = event.data;
@@ -85,7 +99,7 @@
                 let response = { jsonrpc: "2.0", id: body.id };
 
                 if (body.method === "initialize") {
-                    response.result = { protocolVersion: "2026-07-25", capabilities: { tools: {} }, serverInfo: SERVER_INFO };
+                    response.result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: SERVER_INFO };
                 } else if (body.method === "tools/list") {
                     response.result = { tools: TOOLS_LIST };
                 } else if (body.method === "tools/call") {
@@ -94,7 +108,6 @@
                             content: [{ type: "text", text: `Fetched info: ${window.location.href}` }]
                         };
                     } 
-                    // Added Switch Case handling the target JSON URL
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
                             const targetUrl = 'https://github.io';
@@ -117,50 +130,6 @@
                 mcpChannel.postMessage({ type: 'mcp_response', id: id, response: response });
             }
         };
-
-        // 4. Executed ONLY inside the Service Worker thread context
-        if (new URL(location.href).searchParams.get('sw') === 'true') {
-            const clientsMap = new Map();
-            const swChannel = new BroadcastChannel('mcp_routing');
-
-            swChannel.onmessage = (e) => {
-                if (e.data.type === 'mcp_response') {
-                    const resolve = clientsMap.get(e.data.id);
-                    if (resolve) {
-                        resolve(new Response(JSON.stringify(e.data.response), {
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Access-Control-Allow-Origin': '*'
-                            }
-                        }));
-                        clientsMap.delete(e.data.id);
-                    }
-                }
-            };
-
-            self.addEventListener('fetch', (event) => {
-                const url = new URL(event.request.url);
-
-                if (url.pathname.endsWith('/sse')) {
-                    event.respondWith(new Response(
-                        `data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
-                        headers: {
-                            'Content-Type': 'text/event-stream',
-                            'Cache-Control': 'no-cache',
-                            'Access-Control-Allow-Origin': '*'
-                        }
-                    }));
-                } 
-                else if (url.pathname.endsWith('/messages')) {
-                    event.respondWith(new Promise(async (resolve) => {
-                        const body = await event.request.json();
-                        const id = Math.random().toString(36);
-                        clientsMap.set(id, resolve);
-                        swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
-                    }));
-                }
-            });
-        }
     </script>
 </body>
 </html>
