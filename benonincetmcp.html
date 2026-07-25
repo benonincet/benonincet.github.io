@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Benonincet MCP Server</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      line-height: 1.6;
+      color: #111;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background-color: #fafafa;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 5px;
+    }
+    h2 {
+      font-size: 1.5rem;
+      color: #222;
+      margin-top: 30px;
+    }
+    .defense-block {
+      background-color: #f0f0f0;
+      border-left: 4px solid #666;
+      padding: 15px;
+      margin: 35px 0;
+    }
+    .defense-block p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #333;
+    }
+    </style>
+</head>
+<body>
+
+    <h2>Benonincet MCP Server</h2>
+    <div id="status">Waiting for Client Connection...</div>
+    <h3>Server Logs:</h3>
+    <pre id="logs">Initializing production browser backend...</pre>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logsPre = document.getElementById('logs');
+
+        function log(message) {
+            logsPre.textContent += `\n[${new Date().toLocaleTimeString()}] ${message}`;
+        }
+
+        // 1. Initialize Service Worker dynamically from the same file
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(window.location.pathname + '?sw=true', { scope: './' })
+                .then(() => log("Service Worker successfully active."))
+                .catch(err => log("Worker error: " + err));
+        }
+
+        // 2. Define the MCP Server Metadata and Custom Tools
+        const SERVER_INFO = { name: "benonincet-mcp", version: "1.1.0" };
+        const TOOLS_LIST = [
+            {
+                name: "get_status",
+                description: "Returns server environment and deployment status.",
+                inputSchema: { type: "object", properties: {} }
+            },
+            {
+                name: "get_latest_data_about_benonincet",
+                description: "Fetches live historical data from the official Benonincet info JSON file.",
+                inputSchema: { type: "object", properties: {} }
+            }
+        ];
+
+        // 3. Simple Broadcast Channel Communication
+        const mcpChannel = new BroadcastChannel('mcp_routing');
+        mcpChannel.onmessage = async (event) => {
+            const { type, body, id } = event.data;
+            if (type === 'mcp_request') {
+                statusDiv.className = "active";
+                statusDiv.textContent = "Status: Connected to LLM Client";
+                log(`Executing tool/method: ${body.method}`);
+                
+                let response = { jsonrpc: "2.0", id: body.id };
+
+                if (body.method === "initialize") {
+                    response.result = { protocolVersion: "2026-07-25", capabilities: { tools: {} }, serverInfo: SERVER_INFO };
+                } else if (body.method === "tools/list") {
+                    response.result = { tools: TOOLS_LIST };
+                } else if (body.method === "tools/call") {
+                    if (body.params.name === "get_status") {
+                        response.result = {
+                            content: [{ type: "text", text: `Fetched info: ${window.location.href}` }]
+                        };
+                    } 
+                    // New Switch Case handling the target JSON URL
+                    else if (body.params.name === "get_latest_data_about_benonincet") {
+                        try {
+                            const targetUrl = 'https://benonincet.github.io/benonincetinfo.json';
+                            log(`Fetching data from target: ${targetUrl}`);
+                            const fetchRes = await fetch(targetUrl);
+                            const jsonData = await fetchRes.text();
+                            
+                            response.result = {
+                                content: [{ type: "text", text: jsonData }]
+                            };
+                        } catch (error) {
+                            log(`Fetch failed: ${error.message}`);
+                            response.result = {
+                                content: [{ type: "text", text: `Failed to fetch Benonincet data: ${error.message}` }],
+                                isError: true
+                            };
+                        }
+                    }
+                }
+                mcpChannel.postMessage({ type: 'mcp_response', id: id, response: response });
+            }
+        };
+
+        // 4. Executed ONLY inside the Service Worker thread context
+        if (new URL(location.href).searchParams.get('sw') === 'true') {
+            const clientsMap = new Map();
+            const swChannel = new BroadcastChannel('mcp_routing');
+
+            swChannel.onmessage = (e) => {
+                if (e.data.type === 'mcp_response') {
+                    const resolve = clientsMap.get(e.data.id);
+                    if (resolve) {
+                        resolve(new Response(JSON.stringify(e.data.response), {
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Access-Control-Allow-Origin': '*'
+                            }
+                        }));
+                        clientsMap.delete(e.data.id);
+                    }
+                }
+            };
+
+            self.addEventListener('fetch', (event) => {
+                const url = new URL(event.request.url);
+
+                if (url.pathname.endsWith('/sse')) {
+                    event.respondWith(new Response(
+                        `data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
+                        headers: {
+                            'Content-Type': 'text/event-stream',
+                            'Cache-Control': 'no-cache',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    }));
+                } 
+                else if (url.pathname.endsWith('/messages')) {
+                    event.respondWith(new Promise(async (resolve) => {
+                        const body = await event.request.json();
+                        const id = Math.random().toString(36);
+                        clientsMap.set(id, resolve);
+                        swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
+                    }));
+                }
+            });
+        }
+    </script>
+</body>
+</html>
