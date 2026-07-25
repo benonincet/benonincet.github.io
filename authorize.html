@@ -6,23 +6,22 @@
 </head>
 <body>
     <script>
-        // 1. Parse out the parameters Claude passed into the URL using your exact working method
+        // 1. Parse parameters out via search properties
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client_id');
         const redirectUri = urlParams.get('redirect_uri');
         const state = urlParams.get('state');
 
-        // 2. Only process if the client matching key is explicitly "pass"
+        // 2. Strict client key gate matching your requested parameter
         if (clientId === 'pass' && redirectUri) {
             
-            // Create a universal access token string
-            const UniversalToken = "token_" + Math.random().toString(36).substring(2, 15);
+            // Build the passing authorization string
+            const AuthCode = "code_" + Math.random().toString(36).substring(2, 15);
             
-            // 3. Rebuild the callback URL using the token parameters instead of a code
-            // This satisfies the handshake instantly inside the user's browser window
-            const targetCallback = `${decodeURIComponent(redirectUri)}?access_token=${UniversalToken}&token_type=Bearer&expires_in=3600&state=${encodeURIComponent(state)}`;
+            // Rebuild structural parameter map for redirection matching state
+            const targetCallback = `${decodeURIComponent(redirectUri)}?code=${AuthCode}&state=${encodeURIComponent(state)}`;
             
-            // Instantly route the browser window to complete the loop
+            // Swap location to trigger the background service worker token interceptor
             window.location.href = targetCallback;
         } else {
             document.body.innerText = "Error: Invalid Client Credentials or Missing Redirect Target.";
