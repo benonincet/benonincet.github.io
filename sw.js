@@ -1,7 +1,6 @@
 const clientsMap = new Map();
 const swChannel = new BroadcastChannel('mcp_routing');
 
-// Handle responses coming back from your mcp.html page script
 swChannel.onmessage = (e) => {
     if (e.data.type === 'mcp_response') {
         const resolve = clientsMap.get(e.data.id);
@@ -20,12 +19,13 @@ swChannel.onmessage = (e) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // 1. Handle primary Claude Connection and 401 challenge sequence
+    // 1. Intercept the core streaming configuration layer
     if (url.pathname.endsWith('/sse')) {
         const authHeader = event.request.headers.get('authorization');
         
+        // Satisfy the unauthenticated server scan sequence
         if (!authHeader) {
-            event.respondWith(new Response(JSON.stringify({ error: "Handshake required" }), {
+            event.respondWith(new Response(JSON.stringify({ error: "Auth payload required" }), {
                 status: 401,
                 headers: {
                     'Content-Type': 'application/json',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
             return;
         }
 
-        // Once validation clears, spin up the active stream mapping
+        // Establish the data pipeline stream
         event.respondWith(new Response(
             `data: ${JSON.stringify({ event: "endpoint", url: "./messages" })}\n\n`, {
             headers: {
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (event) => {
         }));
     } 
 
-    // 2. Serve metadata configuration descriptors for RFC discovery
+    // 2. Serve the OAuth Metadata file required by Claude’s interface probe
     else if (url.pathname.endsWith('/metadata.json')) {
         event.respondWith(new Response(JSON.stringify({
             issuer: url.origin,
@@ -57,22 +57,7 @@ self.addEventListener('fetch', (event) => {
         }));
     }
 
-    // 3. FIX: Handle the backend POST verification token exchange request
-    // This removes the "Authorization with the MCP server failed" error code block
-    else if (url.pathname.endsWith('/token')) {
-        event.respondWith(new Response(JSON.stringify({
-            access_token: "benonincet_universal_pass_token",
-            token_type: "Bearer",
-            expires_in: 3600
-        }), {
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Access-Control-Allow-Origin': '*' 
-            }
-        }));
-    }
-
-    // 4. Trap and serialize tool execution JSON-RPC payloads
+    // 3. Serialize and route JSON-RPC commands down to the page execution block
     else if (url.pathname.endsWith('/messages')) {
         event.respondWith(new Promise(async (resolve) => {
             try {
@@ -81,7 +66,7 @@ self.addEventListener('fetch', (event) => {
                 clientsMap.set(id, resolve);
                 swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
             } catch (err) {
-                resolve(new Response(JSON.stringify({ error: "Invalid syntax layout" }), { status: 400 }));
+                resolve(new Response(JSON.stringify({ error: "Bad parameters" }), { status: 400 }));
             }
         }));
     }
