@@ -45,7 +45,7 @@
                     } 
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
-                            const targetUrl = 'https://github.io';
+                            const targetUrl = 'https://benonincet.github.io/benonincetinfo.json';
                             const fetchRes = await fetch(targetUrl);
                             const jsonData = await fetchRes.text();
                             response.result = { content: [{ type: "text", text: jsonData }] };
