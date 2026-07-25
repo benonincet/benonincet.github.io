@@ -3,78 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Benonincet MCP Server</title>
-    <link rel="icon" type="image/png" href="favicon.png">
-    <style>
-    body {
-      font-family: 'Times New Roman', Times, serif;
-      line-height: 1.6;
-      color: #111;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 20px;
-      background-color: #fafafa;
-    }
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 5px;
-    }
-    h2 {
-      font-size: 1.5rem;
-      color: #222;
-      margin-top: 30px;
-    }
-    .defense-block {
-      background-color: #f0f0f0;
-      border-left: 4px solid #666;
-      padding: 15px;
-      margin: 35px 0;
-    }
-    .defense-block p {
-      margin: 0;
-      font-size: 0.95rem;
-      color: #333;
-    }
-    #status { padding: 10px; border-radius: 4px; background: #eee; margin-bottom: 20px; font-weight: bold; }
-    .active { background: #d4edda !important; color: #155724; }
-    pre { background: #f8f9fa; padding: 15px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap; }
-    </style>
 </head>
 <body>
-
-    <h2>Benonincet MCP Server</h2>
-    <p>If you are using this in Claude, please type "pass" in both the optional advanced setting slots, then if it fails, re-connect.</p>
-    <div id="status">Waiting for Client Connection...</div>
-    <h3>Server Logs:</h3>
-    <pre id="logs">Initializing production browser backend...</pre>
-
     <script>
-        const statusDiv = document.getElementById('status');
-        const logsPre = document.getElementById('logs');
-
-        function log(message) {
-            logsPre.textContent += `\n[${new Date().toLocaleTimeString()}] ${message}`;
-        }
-
-        // 1. Register the separate sw.js file
+        // 1. Initialize and link the sandbox network layer
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js', { scope: './' })
-                .then((reg) => {
-                    log("Service Worker successfully registered.");
-                    // Check if worker is already controlling the page
-                    if (navigator.serviceWorker.controller) {
-                        log("Service Worker is actively controlling the page.");
-                    }
-                })
-                .catch(err => log("Worker registration error: " + err));
-            
-            // Listen for controller changes to verify activation
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                log("Service Worker claim acquired. Page is now controlled.");
-            });
+                .catch(err => console.error("Worker Boot Error: ", err));
         }
 
-        // 2. Define the MCP Server Metadata and Custom Tools
-        const SERVER_INFO = { name: "benonincet-mcp", version: "1.1.0" };
+        // 2. Define strict tool contracts matching the Model Context Protocol
+        const SERVER_INFO = { name: "benonincet-mcp", version: "1.2.0" };
         const TOOLS_LIST = [
             {
                 name: "get_status",
@@ -83,20 +22,16 @@
             },
             {
                 name: "get_latest_data_about_benonincet",
-                description: "Fetches live historical data from the official Benonincet info JSON file.",
+                description: "Fetches live historical data from the Benonincet info JSON file.",
                 inputSchema: { type: "object", properties: {} }
             }
         ];
 
-        // 3. Setup Broadcast Channel Communication
+        // 3. Process incoming execution queries transmitted from the Service Worker
         const mcpChannel = new BroadcastChannel('mcp_routing');
         mcpChannel.onmessage = async (event) => {
             const { type, body, id } = event.data;
             if (type === 'mcp_request') {
-                statusDiv.className = "active";
-                statusDiv.textContent = "Status: Connected to LLM Client";
-                log(`Executing tool/method: ${body.method}`);
-                
                 let response = { jsonrpc: "2.0", id: body.id };
 
                 if (body.method === "initialize") {
@@ -105,26 +40,17 @@
                     response.result = { tools: TOOLS_LIST };
                 } else if (body.method === "tools/call") {
                     if (body.params.name === "get_status") {
-                        response.result = {
-                            content: [{ type: "text", text: `Fetched info: ${window.location.href}` }]
-                        };
+                        response.result = { content: [{ type: "text", text: `Endpoint active at: ${window.location.href}` }] };
                     } 
+                    // This is your data switch case targeting the info file
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
-                            const targetUrl = 'https://github.io';
-                            log(`Fetching data from target: ${targetUrl}`);
+                            const targetUrl = 'https://benonincet.github.io/benonincetinfo.json';
                             const fetchRes = await fetch(targetUrl);
                             const jsonData = await fetchRes.text();
-                            
-                            response.result = {
-                                content: [{ type: "text", text: jsonData }]
-                            };
+                            response.result = { content: [{ type: "text", text: jsonData }] };
                         } catch (error) {
-                            log(`Fetch failed: ${error.message}`);
-                            response.result = {
-                                content: [{ type: "text", text: `Failed to fetch Benonincet data: ${error.message}` }],
-                                isError: true
-                            };
+                            response.result = { content: [{ type: "text", text: `Fetch Error: ${error.message}` }], isError: true };
                         }
                     }
                 }
