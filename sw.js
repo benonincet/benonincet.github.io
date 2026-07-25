@@ -1,6 +1,7 @@
 const clientsMap = new Map();
 const swChannel = new BroadcastChannel('mcp_routing');
 
+// Handle responses coming back from index.html
 swChannel.onmessage = (e) => {
     if (e.data.type === 'mcp_response') {
         const resolve = clientsMap.get(e.data.id);
@@ -16,6 +17,7 @@ swChannel.onmessage = (e) => {
     }
 };
 
+// Intercept routing requests
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
@@ -33,14 +35,18 @@ self.addEventListener('fetch', (event) => {
     // Trap the JSON-RPC message calls
     else if (url.pathname.endsWith('/messages')) {
         event.respondWith(new Promise(async (resolve) => {
-            const body = await event.request.json();
-            const id = Math.random().toString(36);
-            clientsMap.set(id, resolve);
-            swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
+            try {
+                const body = await event.request.json();
+                const id = Math.random().toString(36);
+                clientsMap.set(id, resolve);
+                swChannel.postMessage({ type: 'mcp_request', body: body, id: id });
+            } catch (err) {
+                resolve(new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400 }));
+            }
         }));
     }
 });
 
-// Force immediately active registration states
+// Force immediately active registration states so the page doesn't require a second reload
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
