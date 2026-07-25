@@ -6,23 +6,33 @@
 </head>
 <body>
     <script>
-        // Extract parameters safely via exact string parsing splits
+        // 1. Use the proper URL parameter API to preserve all trailing fields cleanly
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client_id');
         const redirectUri = urlParams.get('redirect_uri');
-        const state = urlParams.get('state');
-
-        // Execute processing loop ONLY if the credentials match 'pass'
+        
+        // 2. Verify that your Client ID matches exactly "pass"
         if (clientId === 'pass' && redirectUri) {
+            
+            // Build the clean target callback URL object
+            const targetUrl = new URL(decodeURIComponent(redirectUri));
+            
+            // 3. Loop through and perfectly transfer EVERY parameter Claude passed in
+            // This ensures state, code_challenge, and methods are safely carried back
+            urlParams.forEach((value, key) => {
+                if (key !== 'client_id' && key !== 'redirect_uri' && key !== 'response_type') {
+                    targetUrl.searchParams.set(key, value);
+                }
+            });
+
+            // 4. Inject the final generated secure tracking code parameter
             const mockAuthCode = "code_" + Math.random().toString(36).substring(2, 15);
+            targetUrl.searchParams.set('code', mockAuthCode);
             
-            // Build the precise parameter layout that Claude expects
-            const targetCallback = `${decodeURIComponent(redirectUri)}?code=${mockAuthCode}&state=${encodeURIComponent(state)}`;
-            
-            // Bounce the popup back into Claude's processing channel
-            window.location.href = targetCallback;
+            // Instantly execute the redirect loop wrapper back to Claude
+            window.location.href = targetUrl.toString();
         } else {
-            document.body.innerText = "Error: Invalid Client ID criteria.";
+            document.body.innerText = "Error: Invalid Client Credentials or Missing Redirect Target.";
         }
     </script>
 </body>
