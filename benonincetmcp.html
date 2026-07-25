@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Benonincet MCP Server</title>
+    <title>MCP Bridge</title>
 </head>
 <body>
     <script>
@@ -22,7 +22,7 @@
             },
             {
                 name: "get_latest_data_about_benonincet",
-                description: "Fetches live historical data from the Benonincet info JSON file.",
+                description: "Fetches live historical data from the official Benonincet info JSON file.",
                 inputSchema: { type: "object", properties: {} }
             }
         ];
@@ -45,7 +45,7 @@
                     // This is your data switch case targeting the info file
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
-                            const targetUrl = 'https://benonincet.github.io/benonincetinfo.json';
+                            const targetUrl = 'https://github.io';
                             const fetchRes = await fetch(targetUrl);
                             const jsonData = await fetchRes.text();
                             response.result = { content: [{ type: "text", text: jsonData }] };
