@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Authorizing...</title>
+</head>
+<body>
+    <script>
+        // 1. Parse out the parameters Claude passed into the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const clientId = urlParams.get('client_id');
+        const redirectUri = urlParams.get('redirect_uri');
+        const state = urlParams.get('state');
+
+        // 2. Only process if the client matching key is explicitly "pass"
+        if (clientId === 'pass' && redirectUri) {
+            
+            // Create a temporary authorization code 
+            const AuthCode = "code_" + Math.random().toString(36).substring(2, 15);
+            
+            // 3. Construct the clean callback URL containing your code and its original state
+            const targetCallback = `${decodeURIComponent(redirectUri)}?code=${AuthCode}&state=${encodeURIComponent(state)}`;
+            
+            // Instantly route the browser window to complete the loop
+            window.location.href = targetCallback;
+        } else {
+            document.body.innerText = "Error: Invalid Client Credentials or Missing Redirect Target.";
+        }
+    </script>
+</body>
+</html>
