@@ -94,10 +94,10 @@
                             content: [{ type: "text", text: `Fetched info: ${window.location.href}` }]
                         };
                     } 
-                    // New Switch Case handling the target JSON URL
+                    // Added Switch Case handling the target JSON URL
                     else if (body.params.name === "get_latest_data_about_benonincet") {
                         try {
-                            const targetUrl = 'https://benonincet.github.io/benonincetinfo.json';
+                            const targetUrl = 'https://github.io';
                             log(`Fetching data from target: ${targetUrl}`);
                             const fetchRes = await fetch(targetUrl);
                             const jsonData = await fetchRes.text();
