@@ -6,21 +6,23 @@
 </head>
 <body>
     <script>
+        // Extract parameters safely via exact string parsing splits
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client_id');
         const redirectUri = urlParams.get('redirect_uri');
         const state = urlParams.get('state');
 
+        // Execute processing loop ONLY if the credentials match 'pass'
         if (clientId === 'pass' && redirectUri) {
-            // Generate the temporary code Claude's backend expects
-            const AuthCode = "code_" + Math.random().toString(36).substring(2, 15);
+            const mockAuthCode = "code_" + Math.random().toString(36).substring(2, 15);
             
-            // Rebuild the precise parameter string Claude expects
-            const targetCallback = `${decodeURIComponent(redirectUri)}?code=${AuthCode}&state=${encodeURIComponent(state)}`;
+            // Build the precise parameter layout that Claude expects
+            const targetCallback = `${decodeURIComponent(redirectUri)}?code=${mockAuthCode}&state=${encodeURIComponent(state)}`;
             
+            // Bounce the popup back into Claude's processing channel
             window.location.href = targetCallback;
         } else {
-            document.body.innerText = "Error: Invalid Client Credentials or Missing Redirect Target.";
+            document.body.innerText = "Error: Invalid Client ID criteria.";
         }
     </script>
 </body>
